@@ -431,4 +431,9 @@ inline bool create_directories(const path& p) {
 #endif
 }
 
+inline bool exists(const path& p) {
+    return p.exists();
+}
+
+
 NAMESPACE_END(filesystem)
