@@ -44,5 +44,16 @@ int main(int argc, char **argv) {
 
     cout << "resolve(filesystem/path.h) = " << resolver().resolve("filesystem/path.h") << endl;
     cout << "resolve(nonexistant) = " << resolver().resolve("nonexistant") << endl;
+
+    cout << "filesystem:directory_entry = " << endl;
+    for (const directory_entry& x : directory_iterator("filesystem")) {
+        cout << "  " << x.path() << endl;
+    }
+
+    cout << "../filesystem:directory_entry = " << endl;
+    for (const directory_entry& x : directory_iterator("../filesystem")) {
+        cout << "  " << x.path() << endl;
+    }
+
     return 0;
 }

@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
+#include <memory>
 #include <sstream>
 #include <cctype>
 #include <cstdlib>
@@ -25,6 +26,8 @@
 # include <ShlObj.h>
 #else
 # include <unistd.h>
+# include <dirent.h>
+# include <sys/types.h>
 #endif
 #include <sys/stat.h>
 
@@ -401,6 +404,107 @@ protected:
     std::vector<std::string> m_path;
     bool m_absolute;
     bool m_smb; // Unused, except for on Windows
+};
+
+class directory_entry {
+public:
+    directory_entry() = default;
+    explicit directory_entry(const path& p) : p(p) {}
+    filesystem::path path() const {
+        return p;
+    }
+
+private:
+    filesystem::path p;
+};
+
+class directory_iterator {
+public:
+    directory_iterator() = default;
+    directory_iterator(const path& p) : p(p) {}
+    directory_iterator(const directory_iterator& rhs) = default;
+    directory_iterator(directory_iterator&& rhs) = default;
+    ~directory_iterator() = default;
+
+    directory_iterator begin() {
+#if defined(_WIN32)
+        hFind = FindFirstFile((p / path("*")).str().c_str(), &findData);
+#else
+        dir = std::shared_ptr<DIR>(opendir(p.str().c_str()), closedir);
+#endif
+        return increment();
+    }
+
+    directory_iterator end() const {
+        return directory_iterator();
+    }
+
+    bool operator==(const directory_iterator& rhs) const {
+        return entry.path() == rhs.entry.path();
+    }
+
+    bool operator!=(const directory_iterator& rhs) const {
+        return entry.path() != rhs.entry.path();
+    }
+
+    directory_entry operator*() const {
+        return entry;
+    }
+
+    directory_entry* operator->() {
+        return &entry;
+    }
+
+    directory_iterator& increment() {
+#if defined(_WIN32)
+        if (hFind != NULL && hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (findData.cFileName[0] != '.') break;
+            } while (FindNextFile(hFind, &findData));
+        }
+
+        if (hFind != NULL && hFind != INVALID_HANDLE_VALUE) {
+            entry = directory_entry(p / path(findData.cFileName));
+            if (!FindNextFile(hFind, &findData)) {
+                FindClose(hFind);
+                hFind = NULL;
+            }
+        } else {
+            entry = directory_entry();
+        }
+#else
+        dirent *ent = NULL;
+        while ((ent = readdir(dir.get())) != NULL) {
+            if (ent->d_name[0] != '.') break;
+        }
+
+        if (ent)
+            entry = directory_entry(p / path(ent->d_name));
+        else
+            entry = directory_entry();
+#endif
+        return *this;
+    }
+
+    directory_iterator& operator++() {
+        return increment();
+    }
+
+    directory_iterator operator++(int) {
+        directory_iterator prev = *this;
+        increment();
+        return prev;
+    }
+
+private:
+    path p;
+    directory_entry entry;
+#if defined(_WIN32)
+    HANDLE hFind = NULL;
+    WIN32_FIND_DATA findData;
+#else
+    std::shared_ptr<DIR> dir = nullptr;
+#endif
 };
 
 inline bool create_directory(const path& p) {
