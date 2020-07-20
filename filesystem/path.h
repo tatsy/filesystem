@@ -543,5 +543,8 @@ inline bool exists(const path& p) {
     return p.exists();
 }
 
+inline bool is_directory(const path& p) {
+    return p.is_directory();
+}
 
 NAMESPACE_END(filesystem)
